@@ -1,0 +1,763 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Camera, RefreshCw, MapPin, Clock, Calendar, Download, 
+  Sparkles, Image as ImageIcon, AlertCircle, Check, 
+  FlipHorizontal, Upload, Building, Compass, ShieldCheck
+} from 'lucide-react';
+
+export default function App() {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' or 'environment'
+  const [isMirrored, setIsMirrored] = useState(true);
+  const [cameraError, setCameraError] = useState(null);
+  
+  // Real-time device GPS state
+  const [location, setLocation] = useState({
+    lat: '',
+    lon: '',
+    accuracy: null,
+    address: 'Acquiring exact GPS location...',
+    loading: true,
+    isRealGps: false,
+    error: null
+  });
+
+  // Employee Details State
+  const [employeeId, setEmployeeId] = useState('');
+  const [employeeName, setEmployeeName] = useState('');
+  const [department, setDepartment] = useState('MIS / IT Division');
+  
+  // Stamp Design & Positioning State
+  const [stampScale, setStampScale] = useState('large'); // 'normal', 'large', 'xlarge'
+  const [stampPosition, setStampPosition] = useState('bottom-left'); // 'bottom-left', 'bottom-right', 'top-left'
+  const [photoFilter, setPhotoFilter] = useState('none');
+
+  // Time & Live Clock State
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Image Capture & Gallery State
+  const [capturedImages, setCapturedImages] = useState([]);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [flash, setFlash] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const processPosition = async (position) => {
+    const { latitude, longitude, accuracy } = position.coords;
+    const preciseLat = latitude.toFixed(6);
+    const preciseLon = longitude.toFixed(6);
+    const accMeters = Math.round(accuracy) || 5;
+
+    // Immediately reflect physical sensor coordinates
+    setLocation(prev => ({
+      ...prev,
+      lat: preciseLat,
+      lon: preciseLon,
+      accuracy: accMeters,
+      loading: false,
+      isRealGps: true,
+      error: null,
+      // Default to coordinates immediately so UI never hangs
+      address: prev.address.includes('Acquiring') ? `GPS: ${preciseLat}°, ${preciseLon}°` : prev.address
+    }));
+
+    try {
+      // Reverse geocoding with 3.5s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+
+      const data = await res.json();
+      const addr = data.address || {};
+      
+      const street = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood || '';
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || 'Metro Manila';
+      const state = addr.state || addr.region || '';
+      
+      const addressParts = [street, city, state].filter(Boolean);
+      const formatted = addressParts.length > 0 
+        ? addressParts.join(', ') 
+        : `GPS Location: ${preciseLat}°, ${preciseLon}°`;
+
+      setLocation(prev => ({
+        ...prev,
+        address: formatted,
+        loading: false
+      }));
+    } catch (err) {
+      console.warn('Geocoding fallback activated:', err);
+      setLocation(prev => ({
+        ...prev,
+        address: `GPS Location: ${preciseLat}°, ${preciseLon}°`,
+        loading: false
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocation(prev => ({
+        ...prev,
+        loading: false,
+        address: 'Geolocation is not supported by this device/browser',
+        error: 'GPS Unsupported'
+      }));
+      return;
+    }
+
+    const geoOptions = {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 0
+    };
+
+    // Immediate physical GPS acquisition
+    navigator.geolocation.getCurrentPosition(
+      (pos) => processPosition(pos),
+      (err) => {
+        console.warn('GPS Error:', err.message);
+        setLocation(prev => ({
+          ...prev,
+          loading: false,
+          address: 'Location permission required. Please enable device GPS.',
+          error: err.message
+        }));
+      },
+      geoOptions
+    );
+
+    // Continuous watch for movement
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => processPosition(pos),
+      (err) => console.warn('GPS Watch Notice:', err.message),
+      geoOptions
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  const refreshGps = () => {
+    setLocation(prev => ({ ...prev, loading: true }));
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => processPosition(pos),
+        (err) => {
+          setLocation(prev => ({
+            ...prev,
+            loading: false,
+            address: prev.lat && prev.lon 
+              ? `GPS: ${prev.lat}°, ${prev.lon}°`
+              : 'GPS refresh failed. Check location permissions.'
+          }));
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    }
+  };
+
+  const startCamera = async () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setCameraError(null);
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+      setStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+    } catch (err) {
+      console.error('Camera stream error:', err);
+      setCameraError('Camera stream unavailable. You can upload a photo using the button below.');
+    }
+  };
+
+  useEffect(() => {
+    if (!uploadedImage) {
+      startCamera();
+    }
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [facingMode, uploadedImage]);
+
+  const toggleCamera = () => {
+    setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
+    setIsMirrored(facingMode === 'environment');
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUploadedImage(event.target.result);
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const capturePhoto = () => {
+    setFlash(true);
+    setTimeout(() => setFlash(false), 200);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const captureTime = new Date();
+
+    if (uploadedImage) {
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        renderStampToCanvas(ctx, img, img.width, img.height, captureTime, false);
+      };
+      img.src = uploadedImage;
+    } else if (videoRef.current) {
+      const sourceElement = videoRef.current;
+      const sourceWidth = sourceElement.videoWidth || 1280;
+      const sourceHeight = sourceElement.videoHeight || 720;
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
+      renderStampToCanvas(ctx, sourceElement, sourceWidth, sourceHeight, captureTime, isMirrored && facingMode === 'user');
+    }
+  };
+
+  const renderStampToCanvas = (ctx, source, width, height, timeObj, flip) => {
+    ctx.save();
+
+    // Horizontal mirror flip if front camera
+    if (flip) {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    // Apply filter
+    switch (photoFilter) {
+      case 'grayscale': ctx.filter = 'grayscale(100%)'; break;
+      case 'sepia': ctx.filter = 'sepia(80%) contrast(110%)'; break;
+      case 'vivid': ctx.filter = 'saturate(180%) contrast(115%)'; break;
+      case 'warm': ctx.filter = 'sepia(30%) saturate(130%) hue-rotate(-10deg)'; break;
+      case 'cyber': ctx.filter = 'contrast(125%) hue-rotate(180deg) saturate(150%)'; break;
+      default: ctx.filter = 'none';
+    }
+
+    // Draw photo frame
+    ctx.drawImage(source, 0, 0, width, height);
+    ctx.restore();
+
+    // Scale calculation
+    const baseScale = Math.max(width / 1000, 0.85);
+    const sizeMultiplier = stampScale === 'normal' ? 0.8 : stampScale === 'large' ? 1.15 : 1.45;
+    const scale = baseScale * sizeMultiplier;
+
+    // Stamp text data
+    const dateStr = timeObj.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).toUpperCase();
+    
+    const timeStr = timeObj.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+
+    const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
+    const accLabel = location.accuracy ? ` (±${location.accuracy}m)` : '';
+    const coordsStr = location.lat && location.lon 
+      ? `LAT: ${location.lat}° N  |  LON: ${location.lon}° E${accLabel}`
+      : 'ACQUIRING SATELLITE SIGNAL...';
+
+    const empTag = employeeId ? `ID: ${employeeId} ` : '';
+    const nameTag = employeeName ? `${employeeName.toUpperCase()} ` : '';
+    const metaInfo = `${empTag}${nameTag}${coordsStr}`;
+
+    ctx.save();
+    
+    // Position offset calculations
+    let startX = 35 * scale;
+    let startY = height - (160 * scale);
+
+    if (stampPosition === 'bottom-right') {
+      startX = width - (520 * scale);
+      startY = height - (160 * scale);
+    } else if (stampPosition === 'top-left') {
+      startX = 35 * scale;
+      startY = 60 * scale;
+    }
+
+    // Strong see-through drop shadow for high contrast readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    ctx.shadowBlur = 12 * scale;
+    ctx.shadowOffsetX = 3 * scale;
+    ctx.shadowOffsetY = 3 * scale;
+
+    // Line 1: Department Name
+    ctx.fillStyle = '#60A5FA'; // Sky Blue
+    ctx.font = `bold ${22 * scale}px sans-serif`;
+    ctx.fillText(`🏢 ${department.toUpperCase()}`, startX, startY);
+
+    // Line 2: Real-time GPS Location
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `900 ${28 * scale}px sans-serif`;
+    ctx.fillText(`📍 ${displayLoc}`, startX, startY + (38 * scale));
+
+    // Line 3: Timestamp Clock
+    ctx.fillStyle = '#34D399'; // Emerald digital green
+    ctx.font = `bold ${24 * scale}px "Courier New", monospace`;
+    ctx.fillText(`⏱️ ${dateStr}  •  ${timeStr}`, startX, startY + (74 * scale));
+
+    // Line 4: Satellite Telemetry and Employee Details
+    ctx.fillStyle = '#F3F4F6';
+    ctx.font = `600 ${16 * scale}px monospace`;
+    ctx.fillText(`🌐 ${metaInfo}`, startX, startY + (104 * scale));
+
+    ctx.restore();
+
+    // Export generated photo
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const newPhoto = {
+      id: Date.now(),
+      url: dataUrl,
+      timestamp: `${dateStr} ${timeStr}`,
+      location: displayLoc
+    };
+
+    setCapturedImages(prev => [newPhoto, ...prev]);
+    setSelectedPhoto(newPhoto);
+  };
+
+  const downloadPhoto = (photo) => {
+    const link = document.createElement('a');
+    link.download = `MIS-HRIS-Selfie-${Date.now()}.jpg`;
+    link.href = photo.url;
+    link.click();
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between">
+      
+      {/* App Header */}
+      <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-4 sticky top-0 z-30 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg leading-tight tracking-wide flex items-center gap-2">
+              MIS-HRIS Stamp Selfie
+              <span className="text-[10px] font-mono bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                LIVE GPS
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400">Official HRIS Verification Camera</p>
+          </div>
+        </div>
+
+        {/* Live Date & Time Display */}
+        <div className="hidden sm:flex items-center gap-4 text-xs font-mono bg-slate-800/90 px-3.5 py-2 rounded-xl border border-slate-700">
+          <div className="flex items-center gap-1.5 text-blue-400">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>{currentTime.toLocaleDateString()}</span>
+          </div>
+          <div className="w-px h-3 bg-slate-700" />
+          <div className="flex items-center gap-1.5 text-emerald-400">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{currentTime.toLocaleTimeString()}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-6xl mx-auto w-full p-4 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Viewfinder Section */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
+          
+          <div className="relative aspect-[3/4] sm:aspect-video w-full bg-slate-900 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center group">
+            
+            {/* Flash Effect */}
+            {flash && (
+              <div className="absolute inset-0 bg-white z-20 transition-opacity duration-150 opacity-100" />
+            )}
+
+            {/* Live Camera View or Uploaded Source */}
+            {uploadedImage ? (
+              <img 
+                src={uploadedImage} 
+                alt="Uploaded source" 
+                className={`w-full h-full object-cover ${photoFilter !== 'none' ? photoFilter : ''}`}
+              />
+            ) : stream ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${isMirrored && facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+                style={{
+                  filter: photoFilter === 'grayscale' ? 'grayscale(100%)' :
+                          photoFilter === 'sepia' ? 'sepia(80%)' :
+                          photoFilter === 'vivid' ? 'saturate(180%)' :
+                          photoFilter === 'warm' ? 'sepia(30%) saturate(130%)' :
+                          photoFilter === 'cyber' ? 'hue-rotate(180deg) saturate(150%)' : 'none'
+                }}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                <AlertCircle className="w-12 h-12 text-amber-500 mb-3 animate-bounce" />
+                <p className="font-semibold text-slate-200">{cameraError || 'Loading camera stream...'}</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs">Allow browser camera permissions to take a selfie.</p>
+                
+                <label className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-600/30 transition">
+                  <Upload className="w-4 h-4" />
+                  Upload Selfie Instead
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                </label>
+              </div>
+            )}
+
+            {/* Transparent Live Viewfinder Stamp Overlay */}
+            <div className={`absolute pointer-events-none p-4 max-w-md ${
+              stampPosition === 'bottom-right' ? 'bottom-2 right-2 text-right' :
+              stampPosition === 'top-left' ? 'top-2 left-2 text-left' :
+              'bottom-2 left-2 text-left'
+            }`}>
+              <div className="space-y-0.5 drop-shadow-[0_4px_8px_rgba(0,0,0,0.95)]">
+                
+                {/* Department */}
+                <div className="text-blue-400 font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 shrink-0" />
+                  <span>{department}</span>
+                </div>
+
+                {/* Real-Time GPS Address */}
+                <div className="text-white font-black text-sm sm:text-base leading-tight flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span className="uppercase">{location.address}</span>
+                </div>
+
+                {/* Clock Timestamp */}
+                <div className="text-emerald-400 font-mono font-bold text-xs sm:text-sm">
+                  ⏱️ {currentTime.toLocaleDateString()} • {currentTime.toLocaleTimeString()}
+                </div>
+
+                {/* Satellite Coordinates & Employee Info */}
+                <div className="text-slate-200 font-mono text-[10px] sm:text-xs">
+                  🌐 {employeeId && `ID: ${employeeId} | `}
+                  {employeeName && `${employeeName.toUpperCase()} | `}
+                  {location.lat && location.lon 
+                    ? `LAT: ${location.lat}° N, LON: ${location.lon}° E (${location.accuracy ? `±${location.accuracy}m` : ''})`
+                    : 'ACQUIRING SATELLITE...'}
+                </div>
+
+              </div>
+            </div>
+
+            {/* Viewfinder Top Controls */}
+            <div className="absolute top-4 inset-x-4 flex items-center justify-between pointer-events-auto">
+              <span className="px-3 py-1 bg-slate-950/60 backdrop-blur text-white text-xs font-mono rounded-full border border-slate-700/50 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                {facingMode === 'user' ? 'FRONT CAM' : 'BACK CAM'}
+              </span>
+
+              <div className="flex items-center gap-2">
+                {uploadedImage && (
+                  <button
+                    onClick={() => {
+                      setUploadedImage(null);
+                      startCamera();
+                    }}
+                    className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 backdrop-blur text-white text-xs font-medium rounded-full shadow transition"
+                  >
+                    Use Live Camera
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setIsMirrored(!isMirrored)}
+                  title="Toggle Mirror Mode"
+                  className={`p-2.5 rounded-full backdrop-blur border transition ${
+                    isMirrored 
+                      ? 'bg-blue-600/80 border-blue-400 text-white' 
+                      : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <FlipHorizontal className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={toggleCamera}
+                  title="Switch Camera Mode"
+                  className="p-2.5 bg-slate-900/60 hover:bg-slate-800 backdrop-blur border border-slate-700 text-white rounded-full transition"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Shutter Button */}
+          <div className="flex items-center justify-center py-2">
+            <button
+              onClick={capturePhoto}
+              className="relative group p-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shadow-xl shadow-blue-500/25 active:scale-95 transition-all"
+            >
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-slate-950 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full flex items-center justify-center text-white shadow-inner">
+                  <Camera className="w-6 h-6 sm:w-8 sm:h-8" />
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Right Configuration Section */}
+        <div className="lg:col-span-5 flex flex-col gap-5">
+          
+          {/* Read-Only System GPS Monitor */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
+                <Compass className="w-4 h-4" />
+                <span>System Verified GPS Location</span>
+              </div>
+              <button
+                onClick={refreshGps}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
+              >
+                <RefreshCw className={`w-3 h-3 ${location.loading ? 'animate-spin' : ''}`} />
+                Re-sync
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                <span className="text-slate-500 block text-[10px] font-mono mb-0.5">LOCKED ADDRESS</span>
+                <span className="text-slate-100 font-bold leading-snug block uppercase">
+                  {location.address}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">LATITUDE</span>
+                  <span className="text-blue-400 font-bold">{location.lat ? `${location.lat}° N` : 'Acquiring...'}</span>
+                </div>
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">LONGITUDE</span>
+                  <span className="text-blue-400 font-bold">{location.lon ? `${location.lon}° E` : 'Acquiring...'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Department & Employee Verification Panel */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
+              <Building className="w-4 h-4" />
+              <span>Department & Employee Record</span>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Custom Department Name</label>
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="e.g. MIS / IT Division, HR, Accounting"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Employee Name</label>
+                <input
+                  type="text"
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
+                  placeholder="Juan Cruz"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Employee ID</label>
+                <input
+                  type="text"
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
+                  placeholder="EMP-2026-001"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Stamp Layout Customization */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
+              <Sparkles className="w-4 h-4" />
+              <span>Stamp Size & Positioning</span>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Stamp Size</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'normal', label: 'Normal' },
+                  { id: 'large', label: 'Large' },
+                  { id: 'xlarge', label: 'X-Large' }
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setStampScale(s.id)}
+                    className={`py-2 px-3 rounded-xl text-xs font-medium border transition ${
+                      stampScale === s.id
+                        ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Stamp Position</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'bottom-left', label: 'Bottom Left' },
+                  { id: 'bottom-right', label: 'Bottom Right' },
+                  { id: 'top-left', label: 'Top Left' }
+                ].map((pos) => (
+                  <button
+                    key={pos.id}
+                    onClick={() => setStampPosition(pos.id)}
+                    className={`py-2 px-3 rounded-xl text-xs font-medium border transition ${
+                      stampPosition === pos.id
+                        ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {pos.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      {/* Gallery Section */}
+      {capturedImages.length > 0 && (
+        <section className="bg-slate-900 border-t border-slate-800 p-4 mt-8">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 mb-3">
+              <ImageIcon className="w-4 h-4 text-blue-400" />
+              Verified HRIS Selfies ({capturedImages.length})
+            </h2>
+
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-700">
+              {capturedImages.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative group shrink-0 w-36 aspect-[3/4] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 hover:border-blue-500 transition cursor-pointer"
+                  onClick={() => setSelectedPhoto(photo)}
+                >
+                  <img src={photo.url} alt="HRIS Selfie" className="w-full h-full object-cover" />
+                  
+                  <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadPhoto(photo);
+                      }}
+                      className="p-2 bg-blue-600 text-white rounded-full hover:scale-110 transition"
+                      title="Download Photo"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Hidden Canvas */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Preview Modal */}
+      {selectedPhoto && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-lg w-full flex flex-col gap-4 shadow-2xl relative">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400" /> Verified HRIS Selfie
+              </h3>
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-full text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-slate-800 aspect-[3/4] max-h-[60vh] bg-black">
+              <img src={selectedPhoto.url} alt="Captured HRIS Selfie" className="w-full h-full object-contain" />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <div className="text-xs text-slate-400 truncate">
+                <p className="font-semibold text-slate-200 uppercase truncate">{selectedPhoto.location}</p>
+                <p className="font-mono text-[10px] text-slate-500">{selectedPhoto.timestamp}</p>
+              </div>
+
+              <button
+                onClick={() => downloadPhoto(selectedPhoto)}
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-blue-500/25 transition active:scale-95"
+              >
+                <Download className="w-4 h-4" />
+                Save Image
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
