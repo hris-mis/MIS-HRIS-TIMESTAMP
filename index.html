@@ -296,19 +296,25 @@
         return new Blob([bytes], { type: mime });
       };
 
-const saveCapturedPhoto = (dataUrl) => {
+      const saveCapturedPhoto = (dataUrl) => {
         const filename = `MIS-HRIS-Selfie-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+        let objectUrl = null;
 
         try {
+          const blob = dataUrlToBlob(dataUrl);
+          objectUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
-          link.href = dataUrl;
+          link.href = objectUrl;
           link.download = filename;
+          link.rel = 'noopener';
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           return true;
         } catch (err) {
           console.error('Image save failed:', err);
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
           return false;
         }
       };
@@ -377,7 +383,7 @@ const saveCapturedPhoto = (dataUrl) => {
           employeeId: id
         };
 
-const saved = saveCapturedPhoto(dataUrl);
+  const saved = saveCapturedPhoto(dataUrl);
 
         setCapturedImages(prev => [newPhoto, ...prev]);
         setSelectedPhoto(newPhoto);
