@@ -76,6 +76,7 @@
       const [selectedPhoto, setSelectedPhoto] = useState(null);
       const [flash, setFlash] = useState(false);
       const [uploadedImage, setUploadedImage] = useState(null);
+      const [captureError, setCaptureError] = useState('');
 
       useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -220,13 +221,48 @@
       };
 
       useEffect(() => {
-        if (!uploadedImage) {
-          startCamera();
-        }
-        return () => {
+        let cancelled = false;
+
+        const initCamera = async () => {
+          if (uploadedImage) return;
+
           if (stream) {
             stream.getTracks().forEach(track => track.stop());
           }
+
+          setCameraError(null);
+          try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode,
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              },
+              audio: false
+            });
+
+            if (cancelled) {
+              newStream.getTracks().forEach(track => track.stop());
+              return;
+            }
+
+            setStream(newStream);
+            if (videoRef.current) {
+              videoRef.current.srcObject = newStream;
+            }
+          } catch (err) {
+            if (!cancelled) {
+              console.error('Camera stream error:', err);
+              setCameraError('Camera stream unavailable. You can upload a photo using the button below.');
+              setStream(null);
+            }
+          }
+        };
+
+        initCamera();
+
+        return () => {
+          cancelled = true;
         };
       }, [facingMode, uploadedImage]);
 
@@ -251,31 +287,97 @@
       };
 
       const capturePhoto = () => {
+        const name = employeeName.trim();
+        const id = employeeId.trim();
+
+        // Validate before doing anything that creates/saves a photo.
+        if (!name || !id) {
+          setCaptureError('Please enter the Employee Name and Employee Number before capturing the photo.');
+          return;
+        }
+
+        setCaptureError('');
         setFlash(true);
         setTimeout(() => setFlash(false), 200);
 
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+          setCaptureError('Unable to prepare the capture. Please try again.');
+          return;
+        }
 
         const ctx = canvas.getContext('2d');
         const captureTime = new Date();
 
+        const finishCapture = (source, width, height, flip = false) => {
+          canvas.width = width;
+          canvas.height = height;
+          renderStampToCanvas(ctx, source, width, height, captureTime, flip);
+
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              setCaptureError('The photo could not be created. Please try again.');
+              return;
+            }
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const dateStr = captureTime.toLocaleDateString('en-US', {
+              weekday: 'short',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            }).toUpperCase();
+            const timeStr = captureTime.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true
+            });
+            const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
+
+            const newPhoto = {
+              id: Date.now(),
+              url: dataUrl,
+              timestamp: `${dateStr} ${timeStr}`,
+              location: displayLoc,
+              employeeName: name,
+              employeeId: id
+            };
+
+            setCapturedImages(prev => [newPhoto, ...prev]);
+            setSelectedPhoto(newPhoto);
+
+            // Automatically download the successfully captured photo.
+            const link = document.createElement('a');
+            link.download = `MIS-HRIS-Selfie-${Date.now()}.jpg`;
+            link.href = URL.createObjectURL(blob);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          }, 'image/jpeg', 0.95);
+        };
+
         if (uploadedImage) {
           const img = new Image();
-          img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            renderStampToCanvas(ctx, img, img.width, img.height, captureTime, false);
-          };
+          img.onload = () => finishCapture(img, img.naturalWidth || img.width, img.naturalHeight || img.height, false);
+          img.onerror = () => setCaptureError('The uploaded image could not be captured. Please try another image.');
           img.src = uploadedImage;
-        } else if (videoRef.current) {
-          const sourceElement = videoRef.current;
-          const sourceWidth = sourceElement.videoWidth || 1280;
-          const sourceHeight = sourceElement.videoHeight || 720;
-          canvas.width = sourceWidth;
-          canvas.height = sourceHeight;
-          renderStampToCanvas(ctx, sourceElement, sourceWidth, sourceHeight, captureTime, isMirrored && facingMode === 'user');
+          return;
         }
+
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+          setCaptureError('Camera is not ready yet. Please wait a moment and try again.');
+          return;
+        }
+
+        finishCapture(
+          video,
+          video.videoWidth,
+          video.videoHeight,
+          isMirrored && facingMode === 'user'
+        );
       };
 
       const renderStampToCanvas = (ctx, source, width, height, timeObj, flip) => {
@@ -322,9 +424,9 @@
           ? `LAT: ${location.lat}° N  |  LON: ${location.lon}° E${accLabel}`
           : 'ACQUIRING SATELLITE SIGNAL...';
 
-        const empTag = employeeId ? `ID: ${employeeId} ` : '';
-        const nameTag = employeeName ? `${employeeName.toUpperCase()} ` : '';
-        const metaInfo = `${empTag}${nameTag}${coordsStr}`;
+        const empTag = `ID: ${employeeId.trim()}`;
+        const nameTag = employeeName.trim().toUpperCase();
+        const metaInfo = `${empTag} | ${nameTag} | ${coordsStr}`;
 
         ctx.save();
         
@@ -446,7 +548,7 @@
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                    <Icon name="alert-circle" className="w-12 h-12 text-amber-500 mb-3 animate-bounce" />
+                    <Icon name="alert-circle" className="w-12 h-12 text-amber-500 mb-3" />
                     <p className="font-semibold text-slate-200">{cameraError || 'Loading camera stream...'}</p>
                     <p className="text-xs text-slate-500 mt-1 max-w-xs">Allow browser camera permissions to take a selfie.</p>
                     
@@ -530,12 +632,20 @@
                 </div>
               </div>
 
-              <div className="flex items-center justify-center py-2">
+              <div className="flex flex-col items-center justify-center py-2">
+                {captureError && (
+                  <div
+                    role="alert"
+                    className="mb-3 w-full max-w-md rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-center text-sm text-rose-300"
+                  >
+                    {captureError}
+                  </div>
+                )}
                 <button
                   onClick={capturePhoto}
-                  className="relative group p-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shadow-xl shadow-blue-500/25 active:scale-95 transition-all"
+                  className="relative group p-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shadow-xl shadow-blue-500/25 transition-all"
                 >
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-slate-950 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-slate-950 flex items-center justify-center">
                     <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full flex items-center justify-center text-white shadow-inner">
                       <Icon name="camera" className="w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
@@ -555,7 +665,7 @@
                     onClick={refreshGps}
                     className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
                   >
-                    <Icon name="refresh-cw" className={`w-3 h-3 ${location.loading ? 'animate-spin' : ''}`} />
+                    <Icon name="refresh-cw" className="w-3 h-3" />
                     Re-sync
                   </button>
                 </div>
@@ -604,7 +714,10 @@
                     <input
                       type="text"
                       value={employeeName}
-                      onChange={(e) => setEmployeeName(e.target.value)}
+                      onChange={(e) => {
+                        setEmployeeName(e.target.value);
+                        if (captureError) setCaptureError('');
+                      }}
                       placeholder="Juan Cruz"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
                     />
@@ -614,7 +727,10 @@
                     <input
                       type="text"
                       value={employeeId}
-                      onChange={(e) => setEmployeeId(e.target.value)}
+                      onChange={(e) => {
+                        setEmployeeId(e.target.value);
+                        if (captureError) setCaptureError('');
+                      }}
                       placeholder="EMP-2026-001"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
                     />
@@ -700,7 +816,7 @@
                             e.stopPropagation();
                             downloadPhoto(photo);
                           }}
-                          className="p-2 bg-blue-600 text-white rounded-full hover:scale-110 transition"
+                          className="p-2 bg-blue-600 text-white rounded-full transition"
                           title="Download Photo"
                         >
                           <Icon name="download" className="w-4 h-4" />
