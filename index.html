@@ -75,7 +75,6 @@
       const [capturedImages, setCapturedImages] = useState([]);
       const [selectedPhoto, setSelectedPhoto] = useState(null);
       const [flash, setFlash] = useState(false);
-      const [uploadedImage, setUploadedImage] = useState(null);
       const [captureError, setCaptureError] = useState('');
 
       useEffect(() => {
@@ -97,7 +96,7 @@
           loading: false,
           isRealGps: true,
           error: null,
-          address: prev.address.includes('Acquiring') ? `GPS: ${preciseLat}°, ${preciseLon}°` : prev.address
+          address: `GPS: ${preciseLat}°, ${preciseLon}°`
         }));
 
         try {
@@ -178,22 +177,38 @@
       }, []);
 
       const refreshGps = () => {
-        setLocation(prev => ({ ...prev, loading: true }));
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => processPosition(pos),
-            (err) => {
-              setLocation(prev => ({
-                ...prev,
-                loading: false,
-                address: prev.lat && prev.lon 
-                  ? `GPS: ${prev.lat}°, ${prev.lon}°`
-                  : 'GPS refresh failed. Check location permissions.'
-              }));
-            },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-          );
+        if (!navigator.geolocation) {
+          setLocation(prev => ({
+            ...prev,
+            loading: false,
+            error: 'GPS Unsupported',
+            address: 'Geolocation is not supported by this browser.'
+          }));
+          return;
         }
+
+        setLocation(prev => ({
+          ...prev,
+          loading: true,
+          error: null,
+          address: 'Refreshing GPS location...'
+        }));
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => processPosition(pos),
+          (err) => {
+            console.warn('GPS refresh error:', err);
+            setLocation(prev => ({
+              ...prev,
+              loading: false,
+              error: err.message,
+              address: prev.lat && prev.lon
+                ? `GPS: ${prev.lat}°, ${prev.lon}°`
+                : 'GPS refresh failed. Check browser location permission.'
+            }));
+          },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
       };
 
       const startCamera = async () => {
@@ -216,7 +231,7 @@
           }
         } catch (err) {
           console.error('Camera stream error:', err);
-          setCameraError('Camera stream unavailable. You can upload a photo using the button below.');
+          setCameraError('Camera stream unavailable. Please allow camera permission and try again.');
         }
       };
 
@@ -224,8 +239,6 @@
         let cancelled = false;
 
         const initCamera = async () => {
-          if (uploadedImage) return;
-
           if (stream) {
             stream.getTracks().forEach(track => track.stop());
           }
@@ -253,7 +266,7 @@
           } catch (err) {
             if (!cancelled) {
               console.error('Camera stream error:', err);
-              setCameraError('Camera stream unavailable. You can upload a photo using the button below.');
+              setCameraError('Camera stream unavailable. Please allow camera permission and try again.');
               setStream(null);
             }
           }
@@ -264,41 +277,84 @@
         return () => {
           cancelled = true;
         };
-      }, [facingMode, uploadedImage]);
+      }, [facingMode]);
 
       const toggleCamera = () => {
-        setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
-        setIsMirrored(facingMode === 'environment');
+        setFacingMode(prev => {
+          const next = prev === 'user' ? 'environment' : 'user';
+          setIsMirrored(next === 'user');
+          return next;
+        });
       };
 
-      const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            setUploadedImage(event.target.result);
-            if (stream) {
-              stream.getTracks().forEach(track => track.stop());
-              setStream(null);
-            }
-          };
-          reader.readAsDataURL(file);
+      const dataUrlToBlob = (dataUrl) => {
+        const parts = dataUrl.split(',');
+        const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+        const binary = atob(parts[1]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+      };
+
+      const saveCapturedPhoto = async (dataUrl) => {
+        const filename = `MIS-HRIS-Selfie-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+
+        try {
+          const blob = dataUrlToBlob(dataUrl);
+
+          // Reliable save dialog in Chrome/Edge
+          if ('showSaveFilePicker' in window) {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: filename,
+              types: [{
+                description: 'JPEG Image',
+                accept: { 'image/jpeg': ['.jpg', '.jpeg'] }
+              }]
+            });
+
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return true;
+          }
+
+          // Fallback for browsers without File System Access API
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+
+          link.href = blobUrl;
+          link.download = filename;
+          link.style.display = 'none';
+
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          return true;
+        } catch (err) {
+          if (err.name === 'AbortError') return false;
+
+          console.error('Image save failed:', err);
+          return false;
         }
       };
 
-      const capturePhoto = () => {
+      const capturePhoto = async () => {
         const name = employeeName.trim();
         const id = employeeId.trim();
 
-        // Validate before doing anything that creates/saves a photo.
+        // Validation MUST happen before flash, capture, save, or download.
         if (!name || !id) {
           setCaptureError('Please enter the Employee Name and Employee Number before capturing the photo.');
           return;
         }
 
-        setCaptureError('');
-        setFlash(true);
-        setTimeout(() => setFlash(false), 200);
+        const sourceElement = videoRef.current;
+        if (!sourceElement || !stream || sourceElement.readyState < 2 || !sourceElement.videoWidth) {
+          setCaptureError('Camera is not ready yet. Please wait for the live camera preview, then try again.');
+          return;
+        }
 
         const canvas = canvasRef.current;
         if (!canvas) {
@@ -306,78 +362,56 @@
           return;
         }
 
-        const ctx = canvas.getContext('2d');
+        setCaptureError('');
+        setFlash(true);
+        setTimeout(() => setFlash(false), 180);
+
+        const ctx = canvas.getContext('2d', { alpha: false });
         const captureTime = new Date();
+        const sourceWidth = sourceElement.videoWidth;
+        const sourceHeight = sourceElement.videoHeight;
 
-        const finishCapture = (source, width, height, flip = false) => {
-          canvas.width = width;
-          canvas.height = height;
-          renderStampToCanvas(ctx, source, width, height, captureTime, flip);
-
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              setCaptureError('The photo could not be created. Please try again.');
-              return;
-            }
-
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-            const dateStr = captureTime.toLocaleDateString('en-US', {
-              weekday: 'short',
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            }).toUpperCase();
-            const timeStr = captureTime.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true
-            });
-            const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
-
-            const newPhoto = {
-              id: Date.now(),
-              url: dataUrl,
-              timestamp: `${dateStr} ${timeStr}`,
-              location: displayLoc,
-              employeeName: name,
-              employeeId: id
-            };
-
-            setCapturedImages(prev => [newPhoto, ...prev]);
-            setSelectedPhoto(newPhoto);
-
-            // Automatically download the successfully captured photo.
-            const link = document.createElement('a');
-            link.download = `MIS-HRIS-Selfie-${Date.now()}.jpg`;
-            link.href = URL.createObjectURL(blob);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-          }, 'image/jpeg', 0.95);
-        };
-
-        if (uploadedImage) {
-          const img = new Image();
-          img.onload = () => finishCapture(img, img.naturalWidth || img.width, img.naturalHeight || img.height, false);
-          img.onerror = () => setCaptureError('The uploaded image could not be captured. Please try another image.');
-          img.src = uploadedImage;
-          return;
-        }
-
-        const video = videoRef.current;
-        if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
-          setCaptureError('Camera is not ready yet. Please wait a moment and try again.');
-          return;
-        }
-
-        finishCapture(
-          video,
-          video.videoWidth,
-          video.videoHeight,
+        canvas.width = sourceWidth;
+        canvas.height = sourceHeight;
+        const dataUrl = renderStampToCanvas(
+          ctx,
+          sourceElement,
+          sourceWidth,
+          sourceHeight,
+          captureTime,
           isMirrored && facingMode === 'user'
         );
+
+        if (!dataUrl) {
+          setCaptureError('The photo could not be created. Please try again.');
+          return;
+        }
+
+        const dateStr = captureTime.toLocaleDateString('en-US', {
+          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+        }).toUpperCase();
+        const timeStr = captureTime.toLocaleTimeString('en-US', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+        });
+        const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
+
+        const newPhoto = {
+          id: Date.now(),
+          url: dataUrl,
+          timestamp: `${dateStr} ${timeStr}`,
+          location: displayLoc,
+          employeeName: name,
+          employeeId: id
+        };
+
+        const saved = await saveCapturedPhoto(dataUrl);
+
+        setCapturedImages(prev => [newPhoto, ...prev]);
+        setSelectedPhoto(newPhoto);
+
+        if (!saved) {
+          setCaptureError('Photo captured, but saving was cancelled or blocked. Use “Save Image”.');
+        }
       };
 
       const renderStampToCanvas = (ctx, source, width, height, timeObj, flip) => {
@@ -468,23 +502,15 @@
 
         ctx.restore();
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        const newPhoto = {
-          id: Date.now(),
-          url: dataUrl,
-          timestamp: `${dateStr} ${timeStr}`,
-          location: displayLoc
-        };
-
-        setCapturedImages(prev => [newPhoto, ...prev]);
-        setSelectedPhoto(newPhoto);
+        return canvas.toDataURL('image/jpeg', 0.95);
       };
 
       const downloadPhoto = (photo) => {
-        const link = document.createElement('a');
-        link.download = `MIS-HRIS-Selfie-${Date.now()}.jpg`;
-        link.href = photo.url;
-        link.click();
+        if (!photo || !photo.url) return;
+        const saved = saveCapturedPhoto(photo.url);
+        if (!saved) {
+          setCaptureError('Save was cancelled or blocked by the browser.');
+        }
       };
 
       return (
@@ -525,13 +551,7 @@
                   <div className="absolute inset-0 bg-white z-20 transition-opacity duration-150 opacity-100" />
                 )}
 
-                {uploadedImage ? (
-                  <img 
-                    src={uploadedImage} 
-                    alt="Uploaded source" 
-                    className={`w-full h-full object-cover ${photoFilter !== 'none' ? photoFilter : ''}`}
-                  />
-                ) : stream ? (
+                {stream ? (
                   <video
                     ref={videoRef}
                     autoPlay
@@ -552,11 +572,7 @@
                     <p className="font-semibold text-slate-200">{cameraError || 'Loading camera stream...'}</p>
                     <p className="text-xs text-slate-500 mt-1 max-w-xs">Allow browser camera permissions to take a selfie.</p>
                     
-                    <label className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-600/30 transition">
-                      <Icon name="upload" className="w-4 h-4" />
-                      Upload Selfie Instead
-                      <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                    </label>
+                    <p className="text-xs text-slate-500 mt-3">Live camera only. Please allow camera access to capture the photo.</p>
                   </div>
                 )}
 
@@ -597,18 +613,6 @@
                   </span>
 
                   <div className="flex items-center gap-2">
-                    {uploadedImage && (
-                      <button
-                        onClick={() => {
-                          setUploadedImage(null);
-                          startCamera();
-                        }}
-                        className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 backdrop-blur text-white text-xs font-medium rounded-full shadow transition"
-                      >
-                        Use Live Camera
-                      </button>
-                    )}
-
                     <button
                       onClick={() => setIsMirrored(!isMirrored)}
                       title="Toggle Mirror Mode"
