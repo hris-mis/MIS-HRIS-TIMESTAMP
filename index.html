@@ -296,45 +296,18 @@
         return new Blob([bytes], { type: mime });
       };
 
-      const saveCapturedPhoto = async (dataUrl) => {
+const saveCapturedPhoto = (dataUrl) => {
         const filename = `MIS-HRIS-Selfie-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
 
         try {
-          const blob = dataUrlToBlob(dataUrl);
-
-          // Reliable save dialog in Chrome/Edge
-          if ('showSaveFilePicker' in window) {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: filename,
-              types: [{
-                description: 'JPEG Image',
-                accept: { 'image/jpeg': ['.jpg', '.jpeg'] }
-              }]
-            });
-
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-            return true;
-          }
-
-          // Fallback for browsers without File System Access API
-          const blobUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
-
-          link.href = blobUrl;
+          link.href = dataUrl;
           link.download = filename;
-          link.style.display = 'none';
-
           document.body.appendChild(link);
           link.click();
-          link.remove();
-
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          document.body.removeChild(link);
           return true;
         } catch (err) {
-          if (err.name === 'AbortError') return false;
-
           console.error('Image save failed:', err);
           return false;
         }
@@ -404,7 +377,7 @@
           employeeId: id
         };
 
-        const saved = await saveCapturedPhoto(dataUrl);
+const saved = saveCapturedPhoto(dataUrl);
 
         setCapturedImages(prev => [newPhoto, ...prev]);
         setSelectedPhoto(newPhoto);
