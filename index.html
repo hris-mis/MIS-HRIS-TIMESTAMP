@@ -255,19 +255,28 @@
 
                 <!-- Custom Department Name -->
                 <div>
-                    <label for="inputDept" class="block text-xs font-semibold text-slate-400 mb-1">Custom Department Name</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="inputDept" class="text-xs font-semibold text-slate-400">Department Name</label>
+                        <span class="text-[10px] text-rose-400 font-bold tracking-wider">* REQUIRED</span>
+                    </div>
                     <input type="text" id="inputDept" value="MIS / IT Division" placeholder="e.g. MIS / IT Division" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm font-medium focus:outline-none transition">
                 </div>
 
                 <!-- Employee Name & ID -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label for="inputEmpName" class="block text-xs font-semibold text-slate-400 mb-1">Employee Name</label>
-                        <input type="text" id="inputEmpName" value="Juan Cruz" placeholder="Juan Cruz" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white text-xs sm:text-sm font-medium focus:outline-none transition">
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="inputEmpName" class="text-xs font-semibold text-slate-400">Employee Name</label>
+                            <span class="text-[10px] text-rose-400 font-bold tracking-wider">* REQUIRED</span>
+                        </div>
+                        <input type="text" id="inputEmpName" value="" placeholder="" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white text-xs sm:text-sm font-medium focus:outline-none transition">
                     </div>
                     <div>
-                        <label for="inputEmpId" class="block text-xs font-semibold text-slate-400 mb-1">Employee ID</label>
-                        <input type="text" id="inputEmpId" value="EMP-2026-001" placeholder="EMP-2026-001" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white font-mono text-xs sm:text-sm font-medium focus:outline-none transition">
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="inputEmpId" class="text-xs font-semibold text-slate-400">Employee ID</label>
+                            <span class="text-[10px] text-rose-400 font-bold tracking-wider">* REQUIRED</span>
+                        </div>
+                        <input type="text" id="inputEmpId" value="" placeholder="EMP-2026-001" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white font-mono text-xs sm:text-sm font-medium focus:outline-none transition">
                     </div>
                 </div>
             </div>
@@ -358,9 +367,9 @@
                 <i class="fa-solid fa-trash-can"></i>
                 <span>Delete</span>
             </button>
-            <a id="btnDownloadCurrent" download="HRIS_Stamp_Selfie.png" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition text-xs flex items-center justify-center space-x-2">
+            <a id="btnDownloadCurrent" download="HRIS_Stamp_Selfie.jpg" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition text-xs flex items-center justify-center space-x-2">
                 <i class="fa-solid fa-download text-sm"></i>
-                <span>Download PNG</span>
+                <span>Download JPG</span>
             </a>
         </div>
     </div>
@@ -618,7 +627,7 @@
             const dateStr = `${month}/${day}/${year}`;
             const timeStr = `${hours}:${minutes}:${seconds} ${ampm}`;
 
-            const deptText = (state.department || 'MIS / IT DIVISION').toUpperCase();
+            const deptText = (state.department || '').toUpperCase();
             const addressText = state.lockedAddress.toUpperCase();
             const dateTimeText = `${dateStr} • ${timeStr}`;
             const latLngText = `LAT: ${state.latitude}, LON: ${state.longitude}`;
@@ -672,6 +681,39 @@
                 return;
             }
 
+            // Mandatory Field Validation
+            const deptVal = (state.department || '').trim();
+            const empNameVal = (state.employeeName || '').trim();
+            const empIdVal = (state.employeeId || '').trim();
+
+            let hasError = false;
+
+            if (!deptVal) {
+                inputDept.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                hasError = true;
+            } else {
+                inputDept.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+            }
+
+            if (!empNameVal) {
+                inputEmpName.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                hasError = true;
+            } else {
+                inputEmpName.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+            }
+
+            if (!empIdVal) {
+                inputEmpId.classList.add('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                hasError = true;
+            } else {
+                inputEmpId.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+            }
+
+            if (hasError) {
+                showToast("Kailangan i-fill out ang Department at Employee Record!", "error");
+                return;
+            }
+
             // Flash & Audio
             playShutterSound();
             flashOverlay.classList.remove('animate-flash');
@@ -697,7 +739,7 @@
             // Burn stamp overlay onto canvas
             drawCanvasStamp(ctx, width, height);
 
-            const dataUrl = hiddenCanvas.toDataURL('image/png');
+            const dataUrl = hiddenCanvas.toDataURL('image/jpeg', 0.92);
             const now = new Date();
             
             const photoItem = {
@@ -768,7 +810,7 @@
             previewFullImg.src = item.dataUrl;
             previewTimestampStr.textContent = `${item.employee} (${item.empId}) • ${item.timestamp}`;
             btnDownloadCurrent.href = item.dataUrl;
-            btnDownloadCurrent.download = `HRIS_Selfie_${item.empId}_${Date.now()}.png`;
+            btnDownloadCurrent.download = `HRIS_Selfie_${item.empId}_${Date.now()}.jpg`;
 
             photoPreviewModal.classList.remove('hidden');
         }
@@ -829,10 +871,23 @@
             // Inputs Sync
             inputDept.addEventListener('input', (e) => {
                 state.department = e.target.value;
+                if (e.target.value.trim()) {
+                    inputDept.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                }
                 applyStampStyling();
             });
-            inputEmpName.addEventListener('input', (e) => { state.employeeName = e.target.value; });
-            inputEmpId.addEventListener('input', (e) => { state.employeeId = e.target.value; });
+            inputEmpName.addEventListener('input', (e) => { 
+                state.employeeName = e.target.value;
+                if (e.target.value.trim()) {
+                    inputEmpName.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                }
+            });
+            inputEmpId.addEventListener('input', (e) => { 
+                state.employeeId = e.target.value;
+                if (e.target.value.trim()) {
+                    inputEmpId.classList.remove('border-rose-500', 'ring-2', 'ring-rose-500/20');
+                }
+            });
 
             // Stamp Size Buttons
             document.querySelectorAll('.btn-size-opt').forEach(btn => {
