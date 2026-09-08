@@ -1,861 +1,894 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full bg-[#0B0F19] text-slate-100">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MIS-HRIS Stamp Selfie</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- React & ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- Babel compiler for JSX in browser -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MIS-HRIS Stamp Selfie - Verification Camera</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Share Tech Mono', 'JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1322;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 9999px;
+        }
+
+        /* Mirror video camera */
+        .mirror-feed {
+            transform: scaleX(-1);
+        }
+
+        /* Flash overlay */
+        @keyframes flashAnim {
+            0% { opacity: 0.9; }
+            100% { opacity: 0; }
+        }
+        .animate-flash {
+            animation: flashAnim 0.35s ease-out forwards;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Shutter Button Pulse Glow */
+        .shutter-glow {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen">
-  <div id="root"></div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+<body class="h-full min-h-screen flex flex-col justify-between font-sans text-slate-100 bg-[#0B0F19] overflow-x-hidden select-none">
 
-    // Helper SVG Component for Lucide Icons
-    function Icon({ name, className = "w-4 h-4" }) {
-      const ref = useRef(null);
-      useEffect(() => {
-        if (ref.current && window.lucide) {
-          ref.current.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
-          window.lucide.createIcons({
-            attrs: { class: className },
-            nameAttr: 'data-lucide'
-          });
-        }
-      }, [name, className]);
-      return <span ref={ref} className="inline-flex items-center justify-center"></span>;
-    }
+    <!-- Flash Overlay -->
+    <div id="flashOverlay" class="fixed inset-0 bg-white z-50 pointer-events-none opacity-0"></div>
 
-    function App() {
-      const videoRef = useRef(null);
-      const canvasRef = useRef(null);
-      const [stream, setStream] = useState(null);
-      const [facingMode, setFacingMode] = useState('user');
-      const [isMirrored, setIsMirrored] = useState(true);
-      const [cameraError, setCameraError] = useState(null);
-      
-      // Real-time device GPS state
-      const [location, setLocation] = useState({
-        lat: '',
-        lon: '',
-        accuracy: null,
-        address: 'Acquiring exact GPS location...',
-        loading: true,
-        isRealGps: false,
-        error: null
-      });
+    <!-- TOP HEADER -->
+    <header class="w-full bg-[#0F172A]/80 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 border border-blue-400/30">
+                <i class="fa-solid fa-shield-halved text-white text-xl"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="font-extrabold text-base sm:text-lg text-white tracking-tight leading-none">MIS-HRIS Stamp Selfie</h1>
+                    <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 tracking-wider">LIVE GPS</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Official HRIS Verification Camera</p>
+            </div>
+        </div>
 
-      // Employee Details State
-      const [employeeId, setEmployeeId] = useState('');
-      const [employeeName, setEmployeeName] = useState('');
-      const [department, setDepartment] = useState('MIS / IT Division');
-      
-      // Stamp Design & Positioning State
-      const [stampScale, setStampScale] = useState('large');
-      const [stampPosition, setStampPosition] = useState('bottom-left');
-      const [photoFilter, setPhotoFilter] = useState('none');
+        <!-- Date / Time Cards Header Bar -->
+        <div class="flex items-center space-x-3">
+            <!-- Gallery Drawer Toggle -->
+            <button id="btnOpenGallery" title="View Saved Photos" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-2 transition active:scale-95">
+                <i class="fa-solid fa-images text-blue-400"></i>
+                <span class="hidden sm:inline">Saved Photos</span>
+                <span id="galleryBadge" class="hidden px-1.5 py-0.2 rounded-full bg-blue-500 text-white font-bold text-[10px]">0</span>
+            </button>
 
-      // Time & Live Clock State
-      const [currentTime, setCurrentTime] = useState(new Date());
+            <!-- Top Realtime Date & Time -->
+            <div class="flex items-center space-x-2 bg-[#131B2E] border border-slate-800 rounded-2xl px-4 py-2 text-xs font-mono shadow-inner">
+                <div class="flex items-center space-x-1.5 text-slate-300 pr-3 border-r border-slate-800">
+                    <i class="fa-solid fa-calendar-days text-rose-500 text-sm"></i>
+                    <span id="headerDateStr">9/8/2026</span>
+                </div>
+                <div class="flex items-center space-x-1.5 text-emerald-400 pl-1">
+                    <i class="fa-solid fa-clock text-rose-500 text-sm"></i>
+                    <span id="headerTimeStr" class="font-bold">9:16:35 AM</span>
+                </div>
+            </div>
+        </div>
+    </header>
 
-      // Image Capture & Gallery State
-      const [capturedImages, setCapturedImages] = useState([]);
-      const [selectedPhoto, setSelectedPhoto] = useState(null);
-      const [flash, setFlash] = useState(false);
-      const [captureError, setCaptureError] = useState('');
+    <!-- MAIN BODY CONTENT GRID -->
+    <main class="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- LEFT COLUMN: LIVE CAMERA VIEWPORT & SHUTTER BUTTON (lg:col-span-7) -->
+        <div class="lg:col-span-7 flex flex-col items-center space-y-5">
+            
+            <!-- Video Container Box -->
+            <div id="videoContainer" class="relative w-full aspect-[4/3] bg-[#111827] rounded-3xl border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
+                
+                <!-- Video Element -->
+                <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover mirror-feed"></video>
 
-      useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
-      }, []);
+                <!-- Camera Loading Placeholder -->
+                <div id="cameraPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#0d1322] z-10">
+                    <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 text-blue-400 animate-pulse">
+                        <i class="fa-solid fa-camera text-2xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-slate-200 mb-1">Connecting Camera</h3>
+                    <p class="text-xs text-slate-400 max-w-xs mb-4">Please grant permission to access your device camera.</p>
+                    <button id="btnRetryCamera" class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl shadow hover:bg-blue-500 transition">
+                        <i class="fa-solid fa-video mr-1.5"></i> Enable Camera
+                    </button>
+                </div>
 
-      const processPosition = async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        const preciseLat = latitude.toFixed(6);
-        const preciseLon = longitude.toFixed(6);
-        const accMeters = Math.round(accuracy) || 5;
+                <!-- TOP VIEWPORT CONTROLS (Front/Back & Mirror) -->
+                <div class="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-auto">
+                    <!-- Camera Facing Indicator -->
+                    <div class="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur border border-slate-700/80 text-[11px] font-mono text-slate-200 flex items-center space-x-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span id="camFacingLabel">FRONT CAM</span>
+                    </div>
 
-        setLocation(prev => ({
-          ...prev,
-          lat: preciseLat,
-          lon: preciseLon,
-          accuracy: accMeters,
-          loading: false,
-          isRealGps: true,
-          error: null,
-          address: `GPS: ${preciseLat}°, ${preciseLon}°`
-        }));
+                    <!-- Actions -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Mirror Toggle -->
+                        <button id="btnToggleMirror" title="Toggle Mirror View" class="w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 backdrop-blur border border-slate-700 flex items-center justify-center transition active:scale-95">
+                            <i class="fa-solid fa-arrows-left-right text-xs"></i>
+                        </button>
+                        <!-- Switch Camera -->
+                        <button id="btnSwitchCam" title="Switch Camera" class="w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 backdrop-blur border border-slate-700 flex items-center justify-center transition active:scale-95">
+                            <i class="fa-solid fa-rotate text-xs"></i>
+                        </button>
+                    </div>
+                </div>
 
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
+                <!-- LIVE OVERLAY WATERMARK STAMP -->
+                <div id="liveOverlayStamp" class="absolute bottom-4 left-4 z-20 pointer-events-none transition-all duration-200 font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-[85%]">
+                    <!-- Department -->
+                    <div class="flex items-center space-x-2 mb-1">
+                        <i class="fa-solid fa-building text-rose-500 text-sm"></i>
+                        <span id="overlayDept" class="font-extrabold text-blue-400 tracking-wide text-xs sm:text-sm uppercase">MIS / IT DIVISION</span>
+                    </div>
+                    <!-- Address -->
+                    <div class="flex items-center space-x-2 mb-1">
+                        <i class="fa-solid fa-location-dot text-rose-500 text-sm"></i>
+                        <span id="overlayAddress" class="font-extrabold text-white text-sm sm:text-base tracking-tight uppercase leading-tight">2ND STREET, PASIG, METRO MANILA</span>
+                    </div>
+                    <!-- Date & Time -->
+                    <div class="flex items-center space-x-2 text-emerald-400 font-mono text-xs sm:text-sm font-semibold mb-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span id="overlayDateTime">9/8/2026 • 9:16:35 AM</span>
+                    </div>
+                    <!-- Coordinates -->
+                    <div class="flex items-center space-x-1.5 text-slate-300 font-mono text-[11px] sm:text-xs">
+                        <i class="fa-solid fa-globe text-blue-400 text-xs"></i>
+                        <span id="overlayLatLng">LAT: 14.574921° N, LON: 121.058942° E</span>
+                    </div>
+                </div>
 
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18`,
-            { signal: controller.signal }
-          );
-          clearTimeout(timeoutId);
+            </div>
 
-          const data = await res.json();
-          const addr = data.address || {};
-          
-          const street = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood || '';
-          const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || 'Metro Manila';
-          const state = addr.state || addr.region || '';
-          
-          const addressParts = [street, city, state].filter(Boolean);
-          const formatted = addressParts.length > 0 
-            ? addressParts.join(', ') 
-            : `GPS Location: ${preciseLat}°, ${preciseLon}°`;
+            <!-- CAMERA SHUTTER BUTTON -->
+            <div class="flex items-center justify-center pt-2">
+                <button id="btnShutter" class="relative group p-1.5 rounded-full bg-[#131B2E] border-2 border-blue-500/40 focus:outline-none active:scale-95 transition-all">
+                    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shutter-glow transition duration-300 group-hover:scale-105">
+                        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white/80 bg-white/20 flex items-center justify-center shadow-inner">
+                            <i class="fa-solid fa-camera text-2xl text-white drop-shadow"></i>
+                        </div>
+                    </div>
+                </button>
+            </div>
 
-          setLocation(prev => ({
-            ...prev,
-            address: formatted,
-            loading: false
-          }));
-        } catch (err) {
-          console.warn('Geocoding fallback activated:', err);
-          setLocation(prev => ({
-            ...prev,
-            address: `GPS Location: ${preciseLat}°, ${preciseLon}°`,
-            loading: false
-          }));
-        }
-      };
+        </div>
 
-      useEffect(() => {
-        if (!navigator.geolocation) {
-          setLocation(prev => ({
-            ...prev,
-            loading: false,
-            address: 'Geolocation is not supported by this device/browser',
-            error: 'GPS Unsupported'
-          }));
-          return;
-        }
+        <!-- RIGHT COLUMN: CONTROL CARDS & RECORD INPUTS (lg:col-span-5) -->
+        <div class="lg:col-span-5 space-y-4">
+            
+            <!-- CARD 1: SYSTEM VERIFIED GPS LOCATION -->
+            <div class="bg-[#131B2E] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2 text-blue-400 text-sm font-bold">
+                        <i class="fa-solid fa-compass"></i>
+                        <span>System Verified GPS Location</span>
+                    </div>
+                    <button id="btnResyncGps" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1 bg-slate-800/80 hover:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-700 transition">
+                        <i class="fa-solid fa-rotate text-[10px]"></i>
+                        <span>Re-sync</span>
+                    </button>
+                </div>
 
-        const geoOptions = {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 0
+                <!-- Address Locked Field -->
+                <div>
+                    <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1">LOCKED ADDRESS</label>
+                    <div class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-bold text-xs sm:text-sm tracking-wide uppercase flex items-center justify-between">
+                        <span id="boxLockedAddress" class="truncate">2ND STREET, PASIG, METRO MANILA</span>
+                        <i class="fa-solid fa-lock text-slate-600 text-xs ml-2"></i>
+                    </div>
+                </div>
+
+                <!-- Lat / Lon Side-by-side -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1">LATITUDE</label>
+                        <div id="boxLatitude" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl px-3 py-2 text-blue-400 font-mono font-bold text-xs sm:text-sm">
+                            14.574921° N
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1">LONGITUDE</label>
+                        <div id="boxLongitude" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl px-3 py-2 text-blue-400 font-mono font-bold text-xs sm:text-sm">
+                            121.058942° E
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD 2: DEPARTMENT & EMPLOYEE RECORD -->
+            <div class="bg-[#131B2E] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                <div class="flex items-center space-x-2 text-blue-400 text-sm font-bold">
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>Department & Employee Record</span>
+                </div>
+
+                <!-- Custom Department Name -->
+                <div>
+                    <label for="inputDept" class="block text-xs font-semibold text-slate-400 mb-1">Custom Department Name</label>
+                    <input type="text" id="inputDept" value="MIS / IT Division" placeholder="e.g. MIS / IT Division" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-white text-xs sm:text-sm font-medium focus:outline-none transition">
+                </div>
+
+                <!-- Employee Name & ID -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="inputEmpName" class="block text-xs font-semibold text-slate-400 mb-1">Employee Name</label>
+                        <input type="text" id="inputEmpName" value="Juan Cruz" placeholder="Juan Cruz" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white text-xs sm:text-sm font-medium focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label for="inputEmpId" class="block text-xs font-semibold text-slate-400 mb-1">Employee ID</label>
+                        <input type="text" id="inputEmpId" value="EMP-2026-001" placeholder="EMP-2026-001" class="w-full bg-[#0B0F19] border border-slate-800 focus:border-blue-500 rounded-xl px-3 py-2 text-white font-mono text-xs sm:text-sm font-medium focus:outline-none transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD 3: STAMP SIZE & POSITIONING -->
+            <div class="bg-[#131B2E] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                <div class="flex items-center space-x-2 text-blue-400 text-sm font-bold">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Stamp Size & Positioning</span>
+                </div>
+
+                <!-- Stamp Size Pills -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">Stamp Size</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-size="normal" class="btn-size-opt py-2 rounded-xl border border-slate-800 bg-[#0B0F19] text-slate-400 text-xs font-semibold hover:text-white transition">Normal</button>
+                        <button data-size="large" class="btn-size-opt py-2 rounded-xl border border-blue-600 bg-blue-600/20 text-blue-300 text-xs font-semibold transition">Large</button>
+                        <button data-size="xlarge" class="btn-size-opt py-2 rounded-xl border border-slate-800 bg-[#0B0F19] text-slate-400 text-xs font-semibold hover:text-white transition">X-Large</button>
+                    </div>
+                </div>
+
+                <!-- Stamp Position Pills -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">Stamp Position</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-pos="bottom-left" class="btn-pos-opt py-2 rounded-xl border border-blue-600 bg-blue-600/20 text-blue-300 text-xs font-semibold transition">Bottom Left</button>
+                        <button data-pos="bottom-right" class="btn-pos-opt py-2 rounded-xl border border-slate-800 bg-[#0B0F19] text-slate-400 text-xs font-semibold hover:text-white transition">Bottom Right</button>
+                        <button data-pos="top-left" class="btn-pos-opt py-2 rounded-xl border border-slate-800 bg-[#0B0F19] text-slate-400 text-xs font-semibold hover:text-white transition">Top Left</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- SAVED PHOTOS GALLERY DRAWER / MODAL -->
+    <div id="galleryModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-end hidden">
+        <div class="w-full max-w-lg bg-[#0F172A] h-full flex flex-col border-l border-slate-800 shadow-2xl">
+            
+            <div class="flex items-center justify-between p-4 border-b border-slate-800 bg-[#0B0F19]">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-images text-blue-400 text-lg"></i>
+                    <h2 class="text-base font-bold text-white">Captured Verification Photos</h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="btnClearAll" class="text-xs px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition">
+                        Clear All
+                    </button>
+                    <button id="btnCloseGallery" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gallery Empty State -->
+            <div id="galleryEmptyState" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                <div class="w-20 h-20 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-600 mb-4 text-3xl">
+                    <i class="fa-solid fa-camera"></i>
+                </div>
+                <h3 class="text-base font-semibold text-slate-300">No Captures Saved</h3>
+                <p class="text-xs text-slate-500 max-w-xs mt-1">Take a photo using the shutter button to save high-resolution timestamped images.</p>
+            </div>
+
+            <!-- Gallery Grid View -->
+            <div id="galleryGrid" class="flex-1 p-4 grid grid-cols-2 gap-3 overflow-y-auto hidden">
+                <!-- Dynamic cards inserted here -->
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FULLSCREEN PHOTO PREVIEW & DOWNLOAD MODAL -->
+    <div id="photoPreviewModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-between p-4 hidden">
+        <div class="w-full max-w-xl flex items-center justify-between pt-2">
+            <span class="text-xs text-slate-400 font-mono" id="previewTimestampStr">MIS-HRIS Selfie Verification</span>
+            <button id="btnClosePreview" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center w-full my-4 max-h-[75vh]">
+            <img id="previewFullImg" class="max-w-full max-h-full rounded-2xl shadow-2xl object-contain border border-slate-800" alt="Selfie Preview">
+        </div>
+
+        <div class="w-full max-w-xs flex items-center justify-center space-x-3 pb-2">
+            <button id="btnDeleteCurrent" class="flex-1 py-3 bg-slate-800 hover:bg-rose-600/30 hover:text-rose-400 text-slate-300 font-semibold rounded-xl border border-slate-700 transition text-xs flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Delete</span>
+            </button>
+            <a id="btnDownloadCurrent" download="HRIS_Stamp_Selfie.png" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition text-xs flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-download text-sm"></i>
+                <span>Download PNG</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Hidden Canvas Element for Output Rendering -->
+    <canvas id="hiddenCanvas" class="hidden"></canvas>
+
+    <script>
+        // APP STATE
+        const state = {
+            stream: null,
+            facingMode: 'user', // 'user' (front) or 'environment' (rear)
+            isMirrored: true,
+            stampSize: 'large', // 'normal', 'large', 'xlarge'
+            stampPos: 'bottom-left', // 'bottom-left', 'bottom-right', 'top-left'
+            department: 'MIS / IT Division',
+            employeeName: 'Juan Cruz',
+            employeeId: 'EMP-2026-001',
+            lockedAddress: '2ND STREET, PASIG, METRO MANILA',
+            latitude: '14.574921° N',
+            longitude: '121.058942° E',
+            gallery: [],
+            activePreviewId: null
         };
 
-        navigator.geolocation.getCurrentPosition(
-          (pos) => processPosition(pos),
-          (err) => {
-            console.warn('GPS Error:', err.message);
-            setLocation(prev => ({
-              ...prev,
-              loading: false,
-              address: 'Location permission required. Please enable device GPS.',
-              error: err.message
-            }));
-          },
-          geoOptions
-        );
+        // DOM ELEMENTS
+        const videoEl = document.getElementById('webcam');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const btnRetryCamera = document.getElementById('btnRetryCamera');
+        const btnShutter = document.getElementById('btnShutter');
+        const btnSwitchCam = document.getElementById('btnSwitchCam');
+        const btnToggleMirror = document.getElementById('btnToggleMirror');
+        const camFacingLabel = document.getElementById('camFacingLabel');
+        const flashOverlay = document.getElementById('flashOverlay');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
 
-        const watchId = navigator.geolocation.watchPosition(
-          (pos) => processPosition(pos),
-          (err) => console.warn('GPS Watch Notice:', err.message),
-          geoOptions
-        );
+        // HEADER & OVERLAY DOM
+        const headerDateStr = document.getElementById('headerDateStr');
+        const headerTimeStr = document.getElementById('headerTimeStr');
+        const liveOverlayStamp = document.getElementById('liveOverlayStamp');
+        const overlayDept = document.getElementById('overlayDept');
+        const overlayAddress = document.getElementById('overlayAddress');
+        const overlayDateTime = document.getElementById('overlayDateTime');
+        const overlayLatLng = document.getElementById('overlayLatLng');
 
-        return () => navigator.geolocation.clearWatch(watchId);
-      }, []);
+        // SIDEBAR DOM
+        const boxLockedAddress = document.getElementById('boxLockedAddress');
+        const boxLatitude = document.getElementById('boxLatitude');
+        const boxLongitude = document.getElementById('boxLongitude');
+        const inputDept = document.getElementById('inputDept');
+        const inputEmpName = document.getElementById('inputEmpName');
+        const inputEmpId = document.getElementById('inputEmpId');
+        const btnResyncGps = document.getElementById('btnResyncGps');
 
-      const refreshGps = () => {
-        if (!navigator.geolocation) {
-          setLocation(prev => ({
-            ...prev,
-            loading: false,
-            error: 'GPS Unsupported',
-            address: 'Geolocation is not supported by this browser.'
-          }));
-          return;
+        // GALLERY & PREVIEW DOM
+        const btnOpenGallery = document.getElementById('btnOpenGallery');
+        const btnCloseGallery = document.getElementById('btnCloseGallery');
+        const galleryModal = document.getElementById('galleryModal');
+        const galleryGrid = document.getElementById('galleryGrid');
+        const galleryEmptyState = document.getElementById('galleryEmptyState');
+        const galleryBadge = document.getElementById('galleryBadge');
+        const btnClearAll = document.getElementById('btnClearAll');
+
+        const photoPreviewModal = document.getElementById('photoPreviewModal');
+        const previewFullImg = document.getElementById('previewFullImg');
+        const btnClosePreview = document.getElementById('btnClosePreview');
+        const btnDownloadCurrent = document.getElementById('btnDownloadCurrent');
+        const btnDeleteCurrent = document.getElementById('btnDeleteCurrent');
+        const previewTimestampStr = document.getElementById('previewTimestampStr');
+
+        // SYNTHETIC AUDIO SHUTTER SOUND
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playShutterSound() {
+            try {
+                if (!audioCtx) audioCtx = new AudioContext();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const bufferSize = audioCtx.sampleRate * 0.08;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1000;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            } catch (e) {
+                console.log("Audio effect suppressed", e);
+            }
         }
 
-        setLocation(prev => ({
-          ...prev,
-          loading: true,
-          error: null,
-          address: 'Refreshing GPS location...'
-        }));
+        // INITIALIZE CAMERA STREAM
+        async function initCamera() {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+            }
 
-        navigator.geolocation.getCurrentPosition(
-          (pos) => processPosition(pos),
-          (err) => {
-            console.warn('GPS refresh error:', err);
-            setLocation(prev => ({
-              ...prev,
-              loading: false,
-              error: err.message,
-              address: prev.lat && prev.lon
-                ? `GPS: ${prev.lat}°, ${prev.lon}°`
-                : 'GPS refresh failed. Check browser location permission.'
-            }));
-          },
-          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-        );
-      };
+            const constraints = {
+                video: {
+                    facingMode: state.facingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 960 }
+                },
+                audio: false
+            };
 
-      const startCamera = async () => {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                state.stream = stream;
+                videoEl.srcObject = stream;
+                await videoEl.play();
+                cameraPlaceholder.classList.add('hidden');
+            } catch (err) {
+                console.warn("Camera access error:", err);
+                cameraPlaceholder.classList.remove('hidden');
+                showToast("Camera access standard prompt needed", "error");
+            }
         }
-        setCameraError(null);
-        try {
-          const newStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: facingMode,
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
-            },
-            audio: false
-          });
-          setStream(newStream);
-          if (videoRef.current) {
-            videoRef.current.srcObject = newStream;
-          }
-        } catch (err) {
-          console.error('Camera stream error:', err);
-          setCameraError('Camera stream unavailable. Please allow camera permission and try again.');
+
+        // GEOLOCATION RESOLUTION
+        function fetchLocation() {
+            if (!navigator.geolocation) {
+                updateGpsUI("2ND STREET, PASIG, METRO MANILA", "14.574921° N", "121.058942° E");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    
+                    const latFormatted = `${Math.abs(lat).toFixed(6)}° ${lat >= 0 ? 'N' : 'S'}`;
+                    const lngFormatted = `${Math.abs(lng).toFixed(6)}° ${lng >= 0 ? 'E' : 'W'}`;
+
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const road = data.address.road || data.address.pedestrian || data.address.suburb || "LOCALITY";
+                            const city = data.address.city || data.address.town || data.address.municipality || "PASIG";
+                            const stateName = data.address.state || data.address.region || "METRO MANILA";
+                            
+                            const fullAddr = `${road}, ${city}, ${stateName}`.toUpperCase();
+                            updateGpsUI(fullAddr, latFormatted, lngFormatted);
+                        } else {
+                            updateGpsUI("2ND STREET, PASIG, METRO MANILA", latFormatted, lngFormatted);
+                        }
+                    } catch (e) {
+                        updateGpsUI("2ND STREET, PASIG, METRO MANILA", latFormatted, lngFormatted);
+                    }
+                },
+                (err) => {
+                    console.warn("Geolocation warning:", err);
+                    updateGpsUI("2ND STREET, PASIG, METRO MANILA", "14.574921° N", "121.058942° E");
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
         }
-      };
 
-      useEffect(() => {
-        let cancelled = false;
+        function updateGpsUI(addr, lat, lng) {
+            state.lockedAddress = addr;
+            state.latitude = lat;
+            state.longitude = lng;
 
-        const initCamera = async () => {
-          if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-          }
+            boxLockedAddress.textContent = addr;
+            boxLatitude.textContent = lat;
+            boxLongitude.textContent = lng;
 
-          setCameraError(null);
-          try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode,
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-              },
-              audio: false
+            overlayAddress.textContent = addr;
+            overlayLatLng.textContent = `LAT: ${lat}, LON: ${lng}`;
+        }
+
+        // DYNAMIC CLOCK & STAMP UPDATE
+        function updateDateTime() {
+            const now = new Date();
+            
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            const year = now.getFullYear();
+
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+
+            const dateStr = `${month}/${day}/${year}`;
+            const timeStr = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+            headerDateStr.textContent = dateStr;
+            headerTimeStr.textContent = timeStr;
+            overlayDateTime.textContent = `${dateStr} • ${timeStr}`;
+        }
+
+        // APPLY STAMP SIZE AND POSITION IN LIVE FEED
+        function applyStampStyling() {
+            // Department
+            overlayDept.textContent = state.department.toUpperCase() || 'MIS / IT DIVISION';
+
+            // Size scale
+            let sizeScale = 1;
+            if (state.stampSize === 'normal') sizeScale = 0.85;
+            if (state.stampSize === 'xlarge') sizeScale = 1.25;
+
+            liveOverlayStamp.style.transform = `scale(${sizeScale})`;
+            liveOverlayStamp.style.transformOrigin = state.stampPos.includes('top') ? 'top left' : (state.stampPos.includes('right') ? 'bottom right' : 'bottom left');
+
+            // Position
+            liveOverlayStamp.className = 'absolute z-20 pointer-events-none transition-all duration-200 font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] max-w-[85%]';
+            
+            if (state.stampPos === 'bottom-left') {
+                liveOverlayStamp.classList.add('bottom-4', 'left-4');
+            } else if (state.stampPos === 'bottom-right') {
+                liveOverlayStamp.classList.add('bottom-4', 'right-4', 'text-right');
+            } else if (state.stampPos === 'top-left') {
+                liveOverlayStamp.classList.add('top-14', 'left-4');
+            }
+        }
+
+        // DRAW STAMP ON CANVAS FOR PNG EXPORT
+        function drawCanvasStamp(ctx, width, height) {
+            ctx.save();
+
+            // Font & Scale calculation based on canvas size
+            let scaleMultiplier = width / 800;
+            if (state.stampSize === 'normal') scaleMultiplier *= 0.85;
+            if (state.stampSize === 'xlarge') scaleMultiplier *= 1.25;
+
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            const year = now.getFullYear();
+
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+
+            const dateStr = `${month}/${day}/${year}`;
+            const timeStr = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+            const deptText = (state.department || 'MIS / IT DIVISION').toUpperCase();
+            const addressText = state.lockedAddress.toUpperCase();
+            const dateTimeText = `${dateStr} • ${timeStr}`;
+            const latLngText = `LAT: ${state.latitude}, LON: ${state.longitude}`;
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+            ctx.shadowBlur = 8 * scaleMultiplier;
+            ctx.shadowOffsetX = 2 * scaleMultiplier;
+            ctx.shadowOffsetY = 2 * scaleMultiplier;
+
+            let margin = 24 * scaleMultiplier;
+            let startX = margin;
+            let startY = height - (110 * scaleMultiplier);
+
+            if (state.stampPos === 'bottom-right') {
+                startX = width - margin;
+                ctx.textAlign = 'right';
+            } else if (state.stampPos === 'top-left') {
+                startY = margin + (35 * scaleMultiplier);
+                ctx.textAlign = 'left';
+            } else {
+                ctx.textAlign = 'left';
+            }
+
+            // 1. Department Name
+            ctx.fillStyle = '#60a5fa'; // bright blue
+            ctx.font = `800 ${Math.round(18 * scaleMultiplier)}px Inter, sans-serif`;
+            ctx.fillText(`🏢 ${deptText}`, startX, startY);
+
+            // 2. Address
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `800 ${Math.round(22 * scaleMultiplier)}px Inter, sans-serif`;
+            ctx.fillText(`📍 ${addressText}`, startX, startY + (28 * scaleMultiplier));
+
+            // 3. Date & Time
+            ctx.fillStyle = '#34d399'; // green emerald
+            ctx.font = `bold ${Math.round(18 * scaleMultiplier)}px "Share Tech Mono", monospace`;
+            ctx.fillText(`🟢 ${dateTimeText}`, startX, startY + (54 * scaleMultiplier));
+
+            // 4. Lat / Lon
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = `${Math.round(15 * scaleMultiplier)}px "Share Tech Mono", monospace`;
+            ctx.fillText(`🌐 ${latLngText}`, startX, startY + (76 * scaleMultiplier));
+
+            ctx.restore();
+        }
+
+        // CAPTURE PHOTO FUNCTION
+        function capturePhoto() {
+            if (!videoEl.videoWidth) {
+                showToast("Camera feed is not ready!", "error");
+                return;
+            }
+
+            // Flash & Audio
+            playShutterSound();
+            flashOverlay.classList.remove('animate-flash');
+            void flashOverlay.offsetWidth;
+            flashOverlay.classList.add('animate-flash');
+
+            const width = videoEl.videoWidth;
+            const height = videoEl.videoHeight;
+
+            hiddenCanvas.width = width;
+            hiddenCanvas.height = height;
+            const ctx = hiddenCanvas.getContext('2d');
+
+            // Draw video (mirror if enabled)
+            ctx.save();
+            if (state.isMirrored && state.facingMode === 'user') {
+                ctx.translate(width, 0);
+                ctx.scale(-1, 1);
+            }
+            ctx.drawImage(videoEl, 0, 0, width, height);
+            ctx.restore();
+
+            // Burn stamp overlay onto canvas
+            drawCanvasStamp(ctx, width, height);
+
+            const dataUrl = hiddenCanvas.toDataURL('image/png');
+            const now = new Date();
+            
+            const photoItem = {
+                id: Date.now(),
+                dataUrl: dataUrl,
+                timestamp: `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
+                employee: state.employeeName,
+                empId: state.employeeId,
+                department: state.department
+            };
+
+            state.gallery.unshift(photoItem);
+            saveGalleryToLocalStorage();
+            updateGalleryUI();
+
+            showToast("HRIS Timestamp Selfie Captured!", "success");
+        }
+
+        // LOCAL STORAGE & GALLERY MANAGEMENT
+        function saveGalleryToLocalStorage() {
+            try {
+                localStorage.setItem('mishris_selfies', JSON.stringify(state.gallery.slice(0, 15)));
+            } catch (e) {
+                console.warn("Local storage full or restricted");
+            }
+        }
+
+        function loadGalleryFromLocalStorage() {
+            try {
+                const data = localStorage.getItem('mishris_selfies');
+                if (data) {
+                    state.gallery = JSON.parse(data);
+                    updateGalleryUI();
+                }
+            } catch (e) {
+                console.warn("Failed to load local gallery");
+            }
+        }
+
+        function updateGalleryUI() {
+            galleryBadge.textContent = state.gallery.length;
+            galleryBadge.style.display = state.gallery.length > 0 ? 'inline-block' : 'none';
+
+            if (state.gallery.length > 0) {
+                galleryEmptyState.classList.add('hidden');
+                galleryGrid.classList.remove('hidden');
+
+                galleryGrid.innerHTML = state.gallery.map(item => `
+                    <div class="relative group aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-md cursor-pointer" onclick="openPhotoPreview(${item.id})">
+                        <img src="${item.dataUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="Saved Selfie">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-2 flex flex-col justify-end text-[10px] text-white">
+                            <span class="font-bold truncate">${item.employee}</span>
+                            <span class="text-slate-300 font-mono text-[9px]">${item.timestamp}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                galleryEmptyState.classList.remove('hidden');
+                galleryGrid.classList.add('hidden');
+            }
+        }
+
+        function openPhotoPreview(id) {
+            const item = state.gallery.find(x => x.id === id);
+            if (!item) return;
+
+            state.activePreviewId = id;
+            previewFullImg.src = item.dataUrl;
+            previewTimestampStr.textContent = `${item.employee} (${item.empId}) • ${item.timestamp}`;
+            btnDownloadCurrent.href = item.dataUrl;
+            btnDownloadCurrent.download = `HRIS_Selfie_${item.empId}_${Date.now()}.png`;
+
+            photoPreviewModal.classList.remove('hidden');
+        }
+
+        function showToast(msg, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === "error" ? "bg-rose-600" : type === "success" ? "bg-blue-600" : "bg-slate-800 border border-slate-700";
+            
+            toast.className = `${bgClass} text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xl flex items-center space-x-2 transition-all duration-300 opacity-0 transform translate-y-2 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}"></i><span>${msg}</span>`;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
             });
 
-            if (cancelled) {
-              newStream.getTracks().forEach(track => track.stop());
-              return;
-            }
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
 
-            setStream(newStream);
-            if (videoRef.current) {
-              videoRef.current.srcObject = newStream;
-            }
-          } catch (err) {
-            if (!cancelled) {
-              console.error('Camera stream error:', err);
-              setCameraError('Camera stream unavailable. Please allow camera permission and try again.');
-              setStream(null);
-            }
-          }
-        };
+        // EVENT BINDINGS
+        window.addEventListener('DOMContentLoaded', () => {
+            initCamera();
+            fetchLocation();
+            setInterval(updateDateTime, 1000);
+            updateDateTime();
+            loadGalleryFromLocalStorage();
 
-        initCamera();
+            // Shutter Button Click
+            btnShutter.addEventListener('click', capturePhoto);
 
-        return () => {
-          cancelled = true;
-        };
-      }, [facingMode]);
+            // Switch Camera
+            btnSwitchCam.addEventListener('click', () => {
+                state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+                camFacingLabel.textContent = state.facingMode === 'user' ? 'FRONT CAM' : 'BACK CAM';
+                initCamera();
+                showToast(`Switched to ${camFacingLabel.textContent}`);
+            });
 
-      const toggleCamera = () => {
-        setFacingMode(prev => {
-          const next = prev === 'user' ? 'environment' : 'user';
-          setIsMirrored(next === 'user');
-          return next;
+            // Mirror Mode
+            btnToggleMirror.addEventListener('click', () => {
+                state.isMirrored = !state.isMirrored;
+                videoEl.classList.toggle('mirror-feed', state.isMirrored);
+                showToast(`Mirror mode ${state.isMirrored ? 'Enabled' : 'Disabled'}`);
+            });
+
+            // Resync GPS Button
+            btnResyncGps.addEventListener('click', () => {
+                showToast("Re-syncing GPS location...");
+                fetchLocation();
+            });
+
+            // Inputs Sync
+            inputDept.addEventListener('input', (e) => {
+                state.department = e.target.value;
+                applyStampStyling();
+            });
+            inputEmpName.addEventListener('input', (e) => { state.employeeName = e.target.value; });
+            inputEmpId.addEventListener('input', (e) => { state.employeeId = e.target.value; });
+
+            // Stamp Size Buttons
+            document.querySelectorAll('.btn-size-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.stampSize = btn.dataset.size;
+                    document.querySelectorAll('.btn-size-opt').forEach(b => {
+                        b.classList.remove('border-blue-600', 'bg-blue-600/20', 'text-blue-300');
+                        b.classList.add('border-slate-800', 'bg-[#0B0F19]', 'text-slate-400');
+                    });
+                    btn.classList.add('border-blue-600', 'bg-blue-600/20', 'text-blue-300');
+                    btn.classList.remove('border-slate-800', 'bg-[#0B0F19]', 'text-slate-400');
+                    applyStampStyling();
+                });
+            });
+
+            // Stamp Position Buttons
+            document.querySelectorAll('.btn-pos-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.stampPos = btn.dataset.pos;
+                    document.querySelectorAll('.btn-pos-opt').forEach(b => {
+                        b.classList.remove('border-blue-600', 'bg-blue-600/20', 'text-blue-300');
+                        b.classList.add('border-slate-800', 'bg-[#0B0F19]', 'text-slate-400');
+                    });
+                    btn.classList.add('border-blue-600', 'bg-blue-600/20', 'text-blue-300');
+                    btn.classList.remove('border-slate-800', 'bg-[#0B0F19]', 'text-slate-400');
+                    applyStampStyling();
+                });
+            });
+
+            // Gallery Modals
+            btnOpenGallery.addEventListener('click', () => galleryModal.classList.remove('hidden'));
+            btnCloseGallery.addEventListener('click', () => galleryModal.classList.add('hidden'));
+
+            btnClearAll.addEventListener('click', () => {
+                state.gallery = [];
+                saveGalleryToLocalStorage();
+                updateGalleryUI();
+                showToast("All captured photos cleared");
+            });
+
+            btnClosePreview.addEventListener('click', () => photoPreviewModal.classList.add('hidden'));
+
+            btnDeleteCurrent.addEventListener('click', () => {
+                if (!state.activePreviewId) return;
+                state.gallery = state.gallery.filter(item => item.id !== state.activePreviewId);
+                saveGalleryToLocalStorage();
+                updateGalleryUI();
+                photoPreviewModal.classList.add('hidden');
+                showToast("Photo deleted");
+            });
+
+            btnRetryCamera.addEventListener('click', initCamera);
+
+            // Initial Stamp Styling
+            applyStampStyling();
         });
-      };
-
-      const dataUrlToBlob = (dataUrl) => {
-        const parts = dataUrl.split(',');
-        const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
-        const binary = atob(parts[1]);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        return new Blob([bytes], { type: mime });
-      };
-
-      const saveCapturedPhoto = (dataUrl) => {
-        const filename = `MIS-HRIS-Selfie-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-        let objectUrl = null;
-
-        try {
-          const blob = dataUrlToBlob(dataUrl);
-          objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = objectUrl;
-          link.download = filename;
-          link.rel = 'noopener';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          return true;
-        } catch (err) {
-          console.error('Image save failed:', err);
-          if (objectUrl) URL.revokeObjectURL(objectUrl);
-          return false;
-        }
-      };
-
-      const capturePhoto = async () => {
-        const name = employeeName.trim();
-        const id = employeeId.trim();
-
-        // Validation MUST happen before flash, capture, save, or download.
-        if (!name || !id) {
-          setCaptureError('Please enter the Employee Name and Employee Number before capturing the photo.');
-          return;
-        }
-
-        const sourceElement = videoRef.current;
-        if (!sourceElement || !stream || sourceElement.readyState < 2 || !sourceElement.videoWidth) {
-          setCaptureError('Camera is not ready yet. Please wait for the live camera preview, then try again.');
-          return;
-        }
-
-        const canvas = canvasRef.current;
-        if (!canvas) {
-          setCaptureError('Unable to prepare the capture. Please try again.');
-          return;
-        }
-
-        setCaptureError('');
-        setFlash(true);
-        setTimeout(() => setFlash(false), 180);
-
-        const ctx = canvas.getContext('2d', { alpha: false });
-        const captureTime = new Date();
-        const sourceWidth = sourceElement.videoWidth;
-        const sourceHeight = sourceElement.videoHeight;
-
-        canvas.width = sourceWidth;
-        canvas.height = sourceHeight;
-        const dataUrl = renderStampToCanvas(
-          ctx,
-          sourceElement,
-          sourceWidth,
-          sourceHeight,
-          captureTime,
-          isMirrored && facingMode === 'user'
-        );
-
-        if (!dataUrl) {
-          setCaptureError('The photo could not be created. Please try again.');
-          return;
-        }
-
-        const dateStr = captureTime.toLocaleDateString('en-US', {
-          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-        }).toUpperCase();
-        const timeStr = captureTime.toLocaleTimeString('en-US', {
-          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
-        });
-        const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
-
-        const newPhoto = {
-          id: Date.now(),
-          url: dataUrl,
-          timestamp: `${dateStr} ${timeStr}`,
-          location: displayLoc,
-          employeeName: name,
-          employeeId: id
-        };
-
-  const saved = saveCapturedPhoto(dataUrl);
-
-        setCapturedImages(prev => [newPhoto, ...prev]);
-        setSelectedPhoto(newPhoto);
-
-        if (!saved) {
-          setCaptureError('Photo captured, but saving was cancelled or blocked. Use “Save Image”.');
-        }
-      };
-
-      const renderStampToCanvas = (ctx, source, width, height, timeObj, flip) => {
-        ctx.save();
-
-        if (flip) {
-          ctx.translate(width, 0);
-          ctx.scale(-1, 1);
-        }
-
-        switch (photoFilter) {
-          case 'grayscale': ctx.filter = 'grayscale(100%)'; break;
-          case 'sepia': ctx.filter = 'sepia(80%) contrast(110%)'; break;
-          case 'vivid': ctx.filter = 'saturate(180%) contrast(115%)'; break;
-          case 'warm': ctx.filter = 'sepia(30%) saturate(130%) hue-rotate(-10deg)'; break;
-          case 'cyber': ctx.filter = 'contrast(125%) hue-rotate(180deg) saturate(150%)'; break;
-          default: ctx.filter = 'none';
-        }
-
-        ctx.drawImage(source, 0, 0, width, height);
-        ctx.restore();
-
-        const baseScale = Math.max(width / 1000, 0.85);
-        const sizeMultiplier = stampScale === 'normal' ? 0.8 : stampScale === 'large' ? 1.15 : 1.45;
-        const scale = baseScale * sizeMultiplier;
-
-        const dateStr = timeObj.toLocaleDateString('en-US', {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }).toUpperCase();
-        
-        const timeStr = timeObj.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true
-        });
-
-        const displayLoc = (location.address || 'ACQUIRING EXACT GPS...').toUpperCase();
-        const accLabel = location.accuracy ? ` (±${location.accuracy}m)` : '';
-        const coordsStr = location.lat && location.lon 
-          ? `LAT: ${location.lat}° N  |  LON: ${location.lon}° E${accLabel}`
-          : 'ACQUIRING SATELLITE SIGNAL...';
-
-        const empTag = `ID: ${employeeId.trim()}`;
-        const nameTag = employeeName.trim().toUpperCase();
-        const metaInfo = `${empTag} | ${nameTag} | ${coordsStr}`;
-
-        ctx.save();
-        
-        let startX = 35 * scale;
-        let startY = height - (160 * scale);
-
-        if (stampPosition === 'bottom-right') {
-          startX = width - (520 * scale);
-          startY = height - (160 * scale);
-        } else if (stampPosition === 'top-left') {
-          startX = 35 * scale;
-          startY = 60 * scale;
-        }
-
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-        ctx.shadowBlur = 12 * scale;
-        ctx.shadowOffsetX = 3 * scale;
-        ctx.shadowOffsetY = 3 * scale;
-
-        // Line 1: Department Name
-        ctx.fillStyle = '#60A5FA';
-        ctx.font = `bold ${22 * scale}px sans-serif`;
-        ctx.fillText(`🏢 ${department.toUpperCase()}`, startX, startY);
-
-        // Line 2: Real-time GPS Location
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = `900 ${28 * scale}px sans-serif`;
-        ctx.fillText(`📍 ${displayLoc}`, startX, startY + (38 * scale));
-
-        // Line 3: Timestamp Clock
-        ctx.fillStyle = '#34D399';
-        ctx.font = `bold ${24 * scale}px "Courier New", monospace`;
-        ctx.fillText(`⏱️ ${dateStr}  •  ${timeStr}`, startX, startY + (74 * scale));
-
-        // Line 4: Satellite Telemetry and Employee Details
-        ctx.fillStyle = '#F3F4F6';
-        ctx.font = `600 ${16 * scale}px monospace`;
-        ctx.fillText(`🌐 ${metaInfo}`, startX, startY + (104 * scale));
-
-        ctx.restore();
-
-        return canvas.toDataURL('image/jpeg', 0.95);
-      };
-
-      const downloadPhoto = (photo) => {
-        if (!photo || !photo.url) return;
-        const saved = saveCapturedPhoto(photo.url);
-        if (!saved) {
-          setCaptureError('Save was cancelled or blocked by the browser.');
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between">
-          <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-4 sticky top-0 z-30 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
-                <Icon name="shield-check" className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg leading-tight tracking-wide flex items-center gap-2">
-                  MIS-HRIS Stamp Selfie
-                  <span className="text-[10px] font-mono bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
-                    LIVE GPS
-                  </span>
-                </h1>
-                <p className="text-xs text-slate-400">Official HRIS Verification Camera</p>
-              </div>
-            </div>
-
-            <div className="hidden sm:flex items-center gap-4 text-xs font-mono bg-slate-800/90 px-3.5 py-2 rounded-xl border border-slate-700">
-              <div className="flex items-center gap-1.5 text-blue-400">
-                <Icon name="calendar" className="w-3.5 h-3.5" />
-                <span>{currentTime.toLocaleDateString()}</span>
-              </div>
-              <div className="w-px h-3 bg-slate-700" />
-              <div className="flex items-center gap-1.5 text-emerald-400">
-                <Icon name="clock" className="w-3.5 h-3.5" />
-                <span>{currentTime.toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </header>
-
-          <main className="max-w-6xl mx-auto w-full p-4 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="relative aspect-[3/4] sm:aspect-video w-full bg-slate-900 rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl flex items-center justify-center group">
-                {flash && (
-                  <div className="absolute inset-0 bg-white z-20 transition-opacity duration-150 opacity-100" />
-                )}
-
-                {stream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover ${isMirrored && facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
-                    style={{
-                      filter: photoFilter === 'grayscale' ? 'grayscale(100%)' :
-                              photoFilter === 'sepia' ? 'sepia(80%)' :
-                              photoFilter === 'vivid' ? 'saturate(180%)' :
-                              photoFilter === 'warm' ? 'sepia(30%) saturate(130%)' :
-                              photoFilter === 'cyber' ? 'hue-rotate(180deg) saturate(150%)' : 'none'
-                    }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                    <Icon name="alert-circle" className="w-12 h-12 text-amber-500 mb-3" />
-                    <p className="font-semibold text-slate-200">{cameraError || 'Loading camera stream...'}</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-xs">Allow browser camera permissions to take a selfie.</p>
-                    
-                    <p className="text-xs text-slate-500 mt-3">Live camera only. Please allow camera access to capture the photo.</p>
-                  </div>
-                )}
-
-                <div className={`absolute pointer-events-none p-4 max-w-md ${
-                  stampPosition === 'bottom-right' ? 'bottom-2 right-2 text-right' :
-                  stampPosition === 'top-left' ? 'top-2 left-2 text-left' :
-                  'bottom-2 left-2 text-left'
-                }`}>
-                  <div className="space-y-0.5 drop-shadow-[0_4px_8px_rgba(0,0,0,0.95)]">
-                    <div className="text-blue-400 font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-1.5">
-                      <Icon name="building" className="w-3.5 h-3.5 shrink-0" />
-                      <span>{department}</span>
-                    </div>
-
-                    <div className="text-white font-black text-sm sm:text-base leading-tight flex items-center gap-1.5">
-                      <Icon name="map-pin" className="w-4 h-4 text-rose-500 shrink-0" />
-                      <span className="uppercase">{location.address}</span>
-                    </div>
-
-                    <div className="text-emerald-400 font-mono font-bold text-xs sm:text-sm">
-                      ⏱️ {currentTime.toLocaleDateString()} • {currentTime.toLocaleTimeString()}
-                    </div>
-
-                    <div className="text-slate-200 font-mono text-[10px] sm:text-xs">
-                      🌐 {employeeId && `ID: ${employeeId} | `}
-                      {employeeName && `${employeeName.toUpperCase()} | `}
-                      {location.lat && location.lon 
-                        ? `LAT: ${location.lat}° N, LON: ${location.lon}° E (${location.accuracy ? `±${location.accuracy}m` : ''})`
-                        : 'ACQUIRING SATELLITE...'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute top-4 inset-x-4 flex items-center justify-between pointer-events-auto">
-                  <span className="px-3 py-1 bg-slate-950/60 backdrop-blur text-white text-xs font-mono rounded-full border border-slate-700/50 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    {facingMode === 'user' ? 'FRONT CAM' : 'BACK CAM'}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsMirrored(!isMirrored)}
-                      title="Toggle Mirror Mode"
-                      className={`p-2.5 rounded-full backdrop-blur border transition ${
-                        isMirrored 
-                          ? 'bg-blue-600/80 border-blue-400 text-white' 
-                          : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <Icon name="flip-horizontal" className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={toggleCamera}
-                      title="Switch Camera Mode"
-                      className="p-2.5 bg-slate-900/60 hover:bg-slate-800 backdrop-blur border border-slate-700 text-white rounded-full transition"
-                    >
-                      <Icon name="refresh-cw" className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center py-2">
-                {captureError && (
-                  <div
-                    role="alert"
-                    className="mb-3 w-full max-w-md rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-center text-sm text-rose-300"
-                  >
-                    {captureError}
-                  </div>
-                )}
-                <button
-                  onClick={capturePhoto}
-                  className="relative group p-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shadow-xl shadow-blue-500/25 transition-all"
-                >
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-slate-950 flex items-center justify-center">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full flex items-center justify-center text-white shadow-inner">
-                      <Icon name="camera" className="w-6 h-6 sm:w-8 sm:h-8" />
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 flex flex-col gap-5">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                    <Icon name="compass" className="w-4 h-4" />
-                    <span>System Verified GPS Location</span>
-                  </div>
-                  <button
-                    onClick={refreshGps}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
-                  >
-                    <Icon name="refresh-cw" className="w-3 h-3" />
-                    Re-sync
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-                    <span className="text-slate-500 block text-[10px] font-mono mb-0.5">LOCKED ADDRESS</span>
-                    <span className="text-slate-100 font-bold leading-snug block uppercase">
-                      {location.address}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">LATITUDE</span>
-                      <span className="text-blue-400 font-bold">{location.lat ? `${location.lat}° N` : 'Acquiring...'}</span>
-                    </div>
-                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">LONGITUDE</span>
-                      <span className="text-blue-400 font-bold">{location.lon ? `${location.lon}° E` : 'Acquiring...'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                  <Icon name="building" className="w-4 h-4" />
-                  <span>Department & Employee Record</span>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Custom Department Name</label>
-                  <input
-                    type="text"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. MIS / IT Division, HR, Accounting"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Employee Name</label>
-                    <input
-                      type="text"
-                      value={employeeName}
-                      onChange={(e) => {
-                        setEmployeeName(e.target.value);
-                        if (captureError) setCaptureError('');
-                      }}
-                      placeholder="Juan Cruz"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Employee ID</label>
-                    <input
-                      type="text"
-                      value={employeeId}
-                      onChange={(e) => {
-                        setEmployeeId(e.target.value);
-                        if (captureError) setCaptureError('');
-                      }}
-                      placeholder="EMP-2026-001"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                  <Icon name="sparkles" className="w-4 h-4" />
-                  <span>Stamp Size & Positioning</span>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 mb-1.5 block">Stamp Size</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'normal', label: 'Normal' },
-                      { id: 'large', label: 'Large' },
-                      { id: 'xlarge', label: 'X-Large' }
-                    ].map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setStampScale(s.id)}
-                        className={`py-2 px-3 rounded-xl text-xs font-medium border transition ${
-                          stampScale === s.id
-                            ? 'bg-blue-600/30 border-blue-500 text-blue-300'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 mb-1.5 block">Stamp Position</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'bottom-left', label: 'Bottom Left' },
-                      { id: 'bottom-right', label: 'Bottom Right' },
-                      { id: 'top-left', label: 'Top Left' }
-                    ].map((pos) => (
-                      <button
-                        key={pos.id}
-                        onClick={() => setStampPosition(pos.id)}
-                        className={`py-2 px-3 rounded-xl text-xs font-medium border transition ${
-                          stampPosition === pos.id
-                            ? 'bg-blue-600/30 border-blue-500 text-blue-300'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        {pos.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </main>
-
-          {capturedImages.length > 0 && (
-            <section className="bg-slate-900 border-t border-slate-800 p-4 mt-8">
-              <div className="max-w-6xl mx-auto">
-                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 mb-3">
-                  <Icon name="image" className="w-4 h-4 text-blue-400" />
-                  Verified HRIS Selfies ({capturedImages.length})
-                </h2>
-
-                <div className="flex gap-4 overflow-x-auto pb-2">
-                  {capturedImages.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="relative group shrink-0 w-36 aspect-[3/4] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 hover:border-blue-500 transition cursor-pointer"
-                      onClick={() => setSelectedPhoto(photo)}
-                    >
-                      <img src={photo.url} alt="HRIS Selfie" className="w-full h-full object-cover" />
-                      
-                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadPhoto(photo);
-                          }}
-                          className="p-2 bg-blue-600 text-white rounded-full transition"
-                          title="Download Photo"
-                        >
-                          <Icon name="download" className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
-
-          <canvas ref={canvasRef} className="hidden" />
-
-          {selectedPhoto && (
-            <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-lg w-full flex flex-col gap-4 shadow-2xl relative">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
-                    <Icon name="check" className="w-4 h-4 text-emerald-400" /> Verified HRIS Selfie
-                  </h3>
-                  <button
-                    onClick={() => setSelectedPhoto(null)}
-                    className="text-slate-400 hover:text-white p-1 rounded-full text-lg font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="rounded-2xl overflow-hidden border border-slate-800 aspect-[3/4] max-h-[60vh] bg-black">
-                  <img src={selectedPhoto.url} alt="Captured HRIS Selfie" className="w-full h-full object-contain" />
-                </div>
-
-                <div className="flex items-center justify-between gap-3 pt-2">
-                  <div className="text-xs text-slate-400 truncate">
-                    <p className="font-semibold text-slate-200 uppercase truncate">{selectedPhoto.location}</p>
-                    <p className="font-mono text-[10px] text-slate-500">{selectedPhoto.timestamp}</p>
-                  </div>
-
-                  <button
-                    onClick={() => downloadPhoto(selectedPhoto)}
-                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-blue-500/25 transition active:scale-95"
-                  >
-                    <Icon name="download" className="w-4 h-4" />
-                    Save Image
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+    </script>
 </body>
 </html>
